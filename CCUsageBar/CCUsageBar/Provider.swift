@@ -33,6 +33,8 @@ struct Provider {
     let id: String
     /// Short label shown as the section header in the popover.
     let displayName: String
+    /// Web usage page for this provider, shown from the popover header.
+    let usageURL: URL?
     /// Executable run via `zsh -l -c <command>` (resolved on the login-shell PATH).
     let command: String
     /// Slash command that prints usage, e.g. "/usage" / "/status".
@@ -82,6 +84,7 @@ extension Provider {
     static let claude = Provider(
         id: "claude",
         displayName: "Claude",
+        usageURL: URL(string: "https://claude.ai/new#settings/usage"),
         command: "claude",
         usageCommand: "/usage",
         ptyRows: 24, ptyCols: 68,
@@ -107,6 +110,7 @@ extension Provider {
     static let codex = Provider(
         id: "codex",
         displayName: "Codex",
+        usageURL: URL(string: "https://chatgpt.com/codex/cloud/settings/analytics#usage"),
         command: "codex",
         usageCommand: "/status",
         // Tall enough that the whole /status box renders in the live frame.

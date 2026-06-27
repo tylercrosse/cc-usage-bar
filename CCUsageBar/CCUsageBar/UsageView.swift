@@ -4,6 +4,7 @@ import AppKit
 private let headerColor = Color(nsColor: .separatorColor).opacity(0.12)
 private let progressTrackColor = Color(nsColor: .quaternaryLabelColor)
 private let statusDotColor = Color(nsColor: .tertiaryLabelColor)
+private let linkColor = Color(nsColor: .linkColor)
 
 /// The popover content: one labeled section per provider, stacked vertically.
 struct UsageStackView: View {
@@ -15,7 +16,10 @@ struct UsageStackView: View {
                 if index > 0 {
                     Divider()
                 }
-                ProviderHeader(title: viewModel.provider.displayName)
+                ProviderHeader(
+                    title: viewModel.provider.displayName,
+                    usageURL: viewModel.provider.usageURL
+                )
                 ProviderSection(viewModel: viewModel)
                     .frame(maxHeight: .infinity)
             }
@@ -28,11 +32,27 @@ struct UsageStackView: View {
 /// Thin bar naming the provider above its output section.
 private struct ProviderHeader: View {
     let title: String
+    let usageURL: URL?
 
     var body: some View {
-        Text(title)
-            .font(.system(.caption, design: .monospaced).weight(.semibold))
-            .foregroundStyle(.secondary)
+        HStack(spacing: 8) {
+            Text(title)
+                .font(.system(.caption, design: .monospaced).weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            Spacer(minLength: 8)
+
+            if let usageURL {
+                Link(destination: usageURL) {
+                    Label("Usage", systemImage: "arrow.up.right.square")
+                        .font(.system(.caption2, design: .monospaced).weight(.semibold))
+                        .labelStyle(.titleAndIcon)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(linkColor)
+                .help("Open \(title) usage")
+            }
+        }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 12)
             .padding(.top, 8)

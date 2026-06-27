@@ -8,7 +8,6 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
         UsageViewModel(provider: .claude),
         UsageViewModel(provider: .codex),
     ]
-    private var clickMonitor: Any?
     private var rightClickMonitor: Any?
     private var rightClickMenu: NSMenu!
     private var refreshTimer: Timer?
@@ -63,7 +62,6 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
     // MARK: - NSPopoverDelegate
 
     func popoverDidClose(_ notification: Notification) {
-        stopClickMonitor()
         viewModels.forEach { $0.dismissPopover() }
     }
 
@@ -75,7 +73,6 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
             viewModels.forEach { $0.run() }
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             NSApp.activate(ignoringOtherApps: true)
-            startClickMonitor()
         }
     }
 
@@ -83,25 +80,4 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
         NSApp.terminate(nil)
     }
 
-    // MARK: - Click-to-dismiss
-
-    private func startClickMonitor() {
-        clickMonitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { [weak self] event in
-            guard let self, let window = self.popover.contentViewController?.view.window else {
-                return event
-            }
-            if event.window == window {
-                self.popover.performClose(nil)
-                return nil  // consume the event
-            }
-            return event
-        }
-    }
-
-    private func stopClickMonitor() {
-        if let monitor = clickMonitor {
-            NSEvent.removeMonitor(monitor)
-            clickMonitor = nil
-        }
-    }
 }
