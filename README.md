@@ -2,7 +2,7 @@
 
 A minimal macOS menu bar app that shows your [Claude Code](https://claude.com/claude-code) and [OpenAI Codex](https://github.com/openai/codex) usage at a glance, stacked in one popover.
 
-![Screenshot](screenshot.png)
+![CC Usage Bar in light and dark mode](static/hero.png)
 
 ## Why
 
