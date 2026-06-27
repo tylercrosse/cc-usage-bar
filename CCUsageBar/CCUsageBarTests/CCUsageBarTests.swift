@@ -105,3 +105,51 @@ struct ANSIParserTests {
         #expect(result.string.hasPrefix("Resets"))
     }
 }
+
+struct UsageSnapshotParserTests {
+    @Test func parsesClaudeUsageRows() {
+        let output = NSAttributedString(string: """
+        Current session
+        █████░░░░░ 47% used
+        Resets 12:30pm (America/Los_Angeles)
+
+        Current week (all models)
+        ██████░░░░ 62% used
+        Resets Jun 28 at 9pm (America/Los_Angeles)
+        """)
+
+        let snapshot = UsageSnapshotParser.parse(provider: .claude, rawOutput: output)
+
+        #expect(snapshot.metrics.count == 2)
+        #expect(snapshot.metrics[0].title == "Current session")
+        #expect(snapshot.metrics[0].valueText == "47% used")
+        #expect(snapshot.metrics[0].detail == "Resets 12:30pm (America/Los_Angeles)")
+        #expect(snapshot.metrics[1].title == "Current week (all models)")
+        #expect(snapshot.metrics[1].valueText == "62% used")
+    }
+
+    @Test func parsesCodexStatusRows() {
+        let output = NSAttributedString(string: """
+        ╭──────────────────────────────────────╮
+        │  >_ OpenAI Codex (v0.142.3)           │
+        │  5h limit:    [███░░░░] 12% left      │
+        │  Resets 1:30pm)                       │
+        │  Weekly limit:[████████░] 60% left    │
+        │  Resets Jun 28 at 9pm)                │
+        │  Credits:     143 credits             │
+        ╰──────────────────────────────────────╯
+        """)
+
+        let snapshot = UsageSnapshotParser.parse(provider: .codex, rawOutput: output)
+
+        #expect(snapshot.metrics.count == 3)
+        #expect(snapshot.metrics[0].title == "5h limit")
+        #expect(snapshot.metrics[0].valueText == "88% used")
+        #expect(snapshot.metrics[0].detail == "Resets 1:30pm")
+        #expect(snapshot.metrics[1].title == "Weekly limit")
+        #expect(snapshot.metrics[1].valueText == "40% used")
+        #expect(snapshot.metrics[1].detail == "Resets Jun 28 at 9pm")
+        #expect(snapshot.metrics[2].title == "Credits")
+        #expect(snapshot.metrics[2].valueText == "143 credits")
+    }
+}

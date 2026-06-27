@@ -4,10 +4,14 @@ import SwiftUI
 final class StatusBarController: NSObject, NSPopoverDelegate {
     private var statusItem: NSStatusItem
     private var popover: NSPopover
-    private let viewModel = UsageViewModel()
+    private let viewModels = [
+        UsageViewModel(provider: .claude),
+        UsageViewModel(provider: .codex),
+    ]
     private var clickMonitor: Any?
     private var rightClickMonitor: Any?
     private var rightClickMenu: NSMenu!
+    private var refreshTimer: Timer?
 
     override init() {
         // Status item with SF Symbol icon
@@ -17,7 +21,7 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
         super.init()
 
         if let button = statusItem.button {
-            button.image = NSImage(systemSymbolName: "chart.bar.yaxis", accessibilityDescription: "Claude Code Usage")
+            button.image = NSImage(systemSymbolName: "chart.bar.yaxis", accessibilityDescription: "AI Usage")
             button.image?.isTemplate = true  // Adapts to light/dark menu bar
             button.action = #selector(togglePopover(_:))
             button.sendAction(on: [.leftMouseUp])
@@ -39,19 +43,28 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
             return nil
         }
 
-        // Popover hosting the SwiftUI UsageView
-        popover.contentSize = NSSize(width: 560, height: 230)
+        // Popover hosting the stacked per-provider SwiftUI views
+        popover.contentSize = NSSize(width: 520, height: 380)
         popover.behavior = .transient     // Dismiss on outside click
         popover.animates = false
         popover.delegate = self
-        popover.contentViewController = NSHostingController(rootView: UsageView(viewModel: viewModel))
+        popover.contentViewController = NSHostingController(rootView: UsageStackView(viewModels: viewModels))
+
+        // Prefetch on launch so data is cached before the first click, then refresh
+        // periodically in the background to keep it reasonably fresh.
+        viewModels.forEach { $0.run(force: true) }
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.viewModels.forEach { $0.run(force: true) }
+            }
+        }
     }
 
     // MARK: - NSPopoverDelegate
 
     func popoverDidClose(_ notification: Notification) {
         stopClickMonitor()
-        viewModel.dismissPopover()
+        viewModels.forEach { $0.dismissPopover() }
     }
 
     @objc private func togglePopover(_ sender: Any?) {
@@ -59,7 +72,7 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
             popover.performClose(sender)
         } else {
             guard let button = statusItem.button else { return }
-            viewModel.run()
+            viewModels.forEach { $0.run() }
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             NSApp.activate(ignoringOtherApps: true)
             startClickMonitor()
