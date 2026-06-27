@@ -125,10 +125,12 @@ struct UsageSnapshotParserTests {
         #expect(snapshot.metrics.count == 2)
         #expect(snapshot.metrics[0].title == "Current session")
         #expect(snapshot.metrics[0].valueText == "47% used")
-        #expect(snapshot.metrics[0].detail == "Resets 12:30pm (America/Los_Angeles)")
+        #expect(snapshot.metrics[0].detail == "Resets in 2h 30m at 12:30pm (America/Los_Angeles)")
+        #expect(snapshot.metrics[0].resetIdentifier == "12:30pm (America/Los_Angeles)")
         #expect(snapshot.metrics[1].title == "Current week (all models)")
         #expect(snapshot.metrics[1].valueText == "62% used")
         #expect(snapshot.metrics[1].detail == "Resets in <1 day on Jun 28 at 9:00pm (America/Los_Angeles)")
+        #expect(snapshot.metrics[1].resetIdentifier == "Jun 28 at 9:00pm (America/Los_Angeles)")
     }
 
     @Test func parsesCodexStatusRows() {
@@ -151,10 +153,12 @@ struct UsageSnapshotParserTests {
         #expect(snapshot.metrics.count == 3)
         #expect(snapshot.metrics[0].title == "5h limit")
         #expect(snapshot.metrics[0].valueText == "88% used")
-        #expect(snapshot.metrics[0].detail == "Resets 1:30pm (\(timezoneName))")
+        #expect(snapshot.metrics[0].detail == "Resets in 4h 30m at 1:30pm (\(timezoneName))")
+        #expect(snapshot.metrics[0].resetIdentifier == "1:30pm (\(timezoneName))")
         #expect(snapshot.metrics[1].title == "Weekly limit")
         #expect(snapshot.metrics[1].valueText == "40% used")
         #expect(snapshot.metrics[1].detail == "Resets in 4 days on Jul 1 at 4:28pm (\(timezoneName))")
+        #expect(snapshot.metrics[1].resetIdentifier == "Jul 1 at 4:28pm (\(timezoneName))")
         #expect(snapshot.metrics[2].title == "Credits")
         #expect(snapshot.metrics[2].valueText == "143 credits")
     }

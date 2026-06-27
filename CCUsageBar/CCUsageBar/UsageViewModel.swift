@@ -480,6 +480,7 @@ final class UsageViewModel: ObservableObject {
         lastLoaded = snapshot
         lastFetch = fetchedAt
         state = .loaded(snapshot)
+        UsageThresholdNotifier.shared.evaluate(snapshot: snapshot, provider: provider)
         // Providers that don't keep their session alive are torn down now.
         if !provider.reusesSession {
             teardownSession()
