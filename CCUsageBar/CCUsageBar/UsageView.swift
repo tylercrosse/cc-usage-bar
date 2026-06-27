@@ -6,6 +6,38 @@ private let progressTrackColor = Color(nsColor: .quaternaryLabelColor)
 private let statusDotColor = Color(nsColor: .tertiaryLabelColor)
 private let linkColor = Color(nsColor: .linkColor)
 
+/// Accent for a metric: a base color (text + bottom of the bar) plus a slightly
+/// lighter shade for the top of the progress-bar gradient.
+private struct MetricAccent {
+    let base: Color
+    let light: Color
+
+    init(_ hex: UInt) {
+        base = Color(hex: hex)
+        light = Color(hex: hex, lightenedBy: 0.18)
+    }
+}
+
+/// "Violet + Warn" palette — tweak the hex values here to retune the bars.
+/// Violet up to 60% used, amber through 80%, coral above 80%.
+private enum UsagePalette {
+    static let low      = MetricAccent(0x8B7FE8)   // violet       (≤60% used)
+    static let mid      = MetricAccent(0xE3A24A)   // amber        (60–80% used)
+    static let high     = MetricAccent(0xE8675C)   // coral        (>80% used)
+    static let quantity = MetricAccent(0xA99BFF)   // light violet (credits / counts)
+}
+
+private extension Color {
+    /// Build a color from a `0xRRGGBB` literal, optionally mixed toward white.
+    init(hex: UInt, lightenedBy amount: Double = 0) {
+        let r = Double((hex >> 16) & 0xFF)
+        let g = Double((hex >> 8) & 0xFF)
+        let b = Double(hex & 0xFF)
+        func mix(_ channel: Double) -> Double { (channel + (255 - channel) * amount) / 255 }
+        self.init(.sRGB, red: mix(r), green: mix(g), blue: mix(b), opacity: 1)
+    }
+}
+
 /// The popover content: one labeled section per provider, stacked vertically.
 struct UsageStackView: View {
     let viewModels: [UsageViewModel]
@@ -24,7 +56,7 @@ struct UsageStackView: View {
                     .frame(maxHeight: .infinity)
             }
         }
-        .frame(width: 520, height: 410)
+        .frame(width: 520, height: 440)
         .background(.regularMaterial)
     }
 }
@@ -176,18 +208,18 @@ private struct MetricRowView: View {
 
                 Text(metric.valueText)
                     .font(.system(.headline, design: .monospaced).weight(.semibold))
-                    .foregroundStyle(accent)
+                    .foregroundStyle(accent.base)
                     .lineLimit(1)
                     .fixedSize(horizontal: true, vertical: false)
             }
 
             if let progress = metric.progress {
-                MetricBarView(progress: progress, color: accent)
+                MetricBarView(progress: progress, accent: accent)
             }
 
             if let detail = metric.detail {
                 Text(detail)
-                    .font(.system(.caption, design: .monospaced))
+                    .font(.system(.body, design: .monospaced))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
@@ -197,36 +229,44 @@ private struct MetricRowView: View {
 
 private struct MetricBarView: View {
     let progress: Double
-    let color: Color
+    let accent: MetricAccent
+
+    private let cornerRadius: CGFloat = 2
 
     var body: some View {
         GeometryReader { proxy in
             ZStack(alignment: .leading) {
-                Capsule()
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .fill(progressTrackColor)
                 if progress > 0 {
-                    Capsule()
-                        .fill(color)
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [accent.light, accent.base],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
                         .frame(width: proxy.size.width * progress)
                 }
             }
         }
-        .frame(height: 7)
+        .frame(height: 14)
     }
 }
 
-private func metricAccent(_ metric: UsageMetric) -> Color {
+private func metricAccent(_ metric: UsageMetric) -> MetricAccent {
     guard let percent = metric.percent else {
-        return Color(nsColor: NSColor.systemCyan)
+        return UsagePalette.quantity
     }
 
     switch metric.direction {
     case .used:
-        if percent >= 80 { return Color(nsColor: NSColor.systemRed) }
-        if percent >= 60 { return Color(nsColor: NSColor.systemOrange) }
-        return Color(nsColor: NSColor.systemGreen)
+        if percent >= 80 { return UsagePalette.high }
+        if percent >= 60 { return UsagePalette.mid }
+        return UsagePalette.low
     case .quantity:
-        return Color(nsColor: NSColor.systemCyan)
+        return UsagePalette.quantity
     }
 }
 
