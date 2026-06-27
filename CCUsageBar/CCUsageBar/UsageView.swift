@@ -1,8 +1,9 @@
 import SwiftUI
 import AppKit
 
-private let bgColor = Color(nsColor: NSColor(red: 0x1C / 255.0, green: 0x1C / 255.0, blue: 0x1E / 255.0, alpha: 1))
-private let headerColor = Color(nsColor: NSColor(red: 0x2A / 255.0, green: 0x2A / 255.0, blue: 0x2E / 255.0, alpha: 1))
+private let headerColor = Color(nsColor: .separatorColor).opacity(0.12)
+private let progressTrackColor = Color(nsColor: .quaternaryLabelColor)
+private let statusDotColor = Color(nsColor: .tertiaryLabelColor)
 
 /// The popover content: one labeled section per provider, stacked vertically.
 struct UsageStackView: View {
@@ -12,7 +13,7 @@ struct UsageStackView: View {
         VStack(spacing: 0) {
             ForEach(Array(viewModels.enumerated()), id: \.offset) { index, viewModel in
                 if index > 0 {
-                    Divider().overlay(Color.black.opacity(0.6))
+                    Divider()
                 }
                 ProviderHeader(title: viewModel.provider.displayName)
                 ProviderSection(viewModel: viewModel)
@@ -20,7 +21,7 @@ struct UsageStackView: View {
             }
         }
         .frame(width: 520, height: 410)
-        .background(bgColor)
+        .background(.regularMaterial)
     }
 }
 
@@ -31,7 +32,7 @@ private struct ProviderHeader: View {
     var body: some View {
         Text(title)
             .font(.system(.caption, design: .monospaced).weight(.semibold))
-            .foregroundStyle(.white.opacity(0.85))
+            .foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 12)
             .padding(.top, 8)
@@ -48,16 +49,15 @@ struct ProviderSection: View {
         Group {
             switch viewModel.state {
             case .idle:
-                bgColor
+                Color.clear
 
             case .loading:
                 ZStack {
-                    bgColor
+                    Color.clear
                     ProgressView("Loading usage\u{2026}")
                         .progressViewStyle(.circular)
                         .controlSize(.regular)
-                        .foregroundStyle(.white)
-                        .colorScheme(.dark)
+                        .foregroundStyle(.primary)
                 }
 
             case .loaded(let snapshot):
@@ -69,17 +69,17 @@ struct ProviderSection: View {
 
             case .rateLimited:
                 ZStack {
-                    bgColor
+                    Color.clear
                     VStack(spacing: 12) {
                         Image(systemName: "clock.badge.exclamationmark")
                             .font(.system(size: 36))
                             .foregroundStyle(.orange)
                         Text("Rate Limited")
                             .font(.system(.title3, design: .monospaced).bold())
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
                         Text("Usage data is temporarily unavailable.\nPlease wait a moment and try again.")
                             .font(.system(.body, design: .monospaced))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
                     }
                     .padding()
@@ -87,17 +87,17 @@ struct ProviderSection: View {
 
             case .needsSetup:
                 ZStack {
-                    bgColor
+                    Color.clear
                     VStack(spacing: 12) {
                         Image(systemName: "person.crop.circle.badge.exclamationmark")
                             .font(.system(size: 36))
                             .foregroundStyle(.yellow)
                         Text("Setup Required")
                             .font(.system(.title3, design: .monospaced).bold())
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
                         Text("Please run `\(viewModel.provider.command)` in your terminal\nto log in and complete setup first.")
                             .font(.system(.body, design: .monospaced))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
                     }
                     .padding()
@@ -105,7 +105,7 @@ struct ProviderSection: View {
 
             case .error(let message):
                 ZStack(alignment: .topLeading) {
-                    bgColor
+                    Color.clear
                     ScrollView {
                         Text("Error: \(message)")
                             .font(.system(.body, design: .monospaced))
@@ -136,7 +136,6 @@ private struct UsageMetricsView: View {
         .padding(.top, 12)
         .padding(.bottom, 10)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(bgColor)
     }
 }
 
@@ -150,7 +149,7 @@ private struct MetricRowView: View {
             HStack(alignment: .firstTextBaseline, spacing: 12) {
                 Text(metric.title)
                     .font(.system(.body, design: .monospaced).weight(.semibold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                     .lineLimit(1)
 
                 Spacer(minLength: 8)
@@ -169,7 +168,7 @@ private struct MetricRowView: View {
             if let detail = metric.detail {
                 Text(detail)
                     .font(.system(.caption, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.55))
+                    .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
         }
@@ -184,7 +183,7 @@ private struct MetricBarView: View {
         GeometryReader { proxy in
             ZStack(alignment: .leading) {
                 Capsule()
-                    .fill(.white.opacity(0.13))
+                    .fill(progressTrackColor)
                 if progress > 0 {
                     Capsule()
                         .fill(color)
@@ -222,17 +221,16 @@ private struct FetchStatusView: View {
                     .controlSize(.mini)
                     .scaleEffect(0.58)
                     .frame(width: 10, height: 10)
-                    .colorScheme(.dark)
                 Text("Refreshing")
             } else {
                 Circle()
-                    .fill(.white.opacity(0.32))
+                    .fill(statusDotColor)
                     .frame(width: 6, height: 6)
                 Text(fetchAgeText(capturedAt))
             }
         }
         .font(.system(.caption2, design: .monospaced))
-        .foregroundStyle(.white.opacity(0.5))
+        .foregroundStyle(.secondary)
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
     }

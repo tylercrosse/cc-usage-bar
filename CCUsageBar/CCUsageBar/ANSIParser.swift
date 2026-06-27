@@ -4,7 +4,7 @@ enum ANSIParser {
     // Screen cell: character + style
     private struct Cell {
         var char: Character = " "
-        var color: NSColor = .white
+        var color: NSColor = .labelColor
         var bgColor: NSColor? = nil
         var isBold: Bool = false
         var isItalic: Bool = false
@@ -20,7 +20,7 @@ enum ANSIParser {
         var screen = [[Cell]](repeating: [Cell](repeating: Cell(), count: cols), count: rows)
         var curRow = 0
         var curCol = 0
-        var currentColor: NSColor = .white
+        var currentColor: NSColor = .labelColor
         var currentBgColor: NSColor? = nil
         var isBold = false
         var isItalic = false
@@ -41,13 +41,13 @@ enum ANSIParser {
                 let n = parts[i]
                 switch n {
                 case 0:
-                    currentColor = .white; currentBgColor = nil; isBold = false; isItalic = false
+                    currentColor = .labelColor; currentBgColor = nil; isBold = false; isItalic = false
                 case 1:  isBold = true
                 case 3:  isItalic = true
                 case 22: isBold = false
                 case 23: isItalic = false
                 case 30...37: currentColor = ANSIParser.standardColor(n - 30)
-                case 39:      currentColor = .white
+                case 39:      currentColor = .labelColor
                 case 40...47: currentBgColor = ANSIParser.standardColor(n - 40)
                 case 49:      currentBgColor = nil
                 case 90...97: currentColor = ANSIParser.brightColor(n - 90)
