@@ -81,6 +81,10 @@ The app runs as a menu bar agent — there is no Dock icon. Look for the chart i
 
 Each time you open the popover, it fetches fresh usage data. A background refresh also runs every 5 minutes so cached values stay warm.
 
+## Acknowledgements
+
+Forked from [lionhylra/cc-usage-bar](https://github.com/lionhylra/cc-usage-bar), which covers Claude Code only. This fork adds Codex support, the `Provider` abstraction, structured parsing, threshold notifications, and the refreshed UI. The original PTY-driving approach and ANSI rendering are theirs.
+
 ## License
 
 MIT
