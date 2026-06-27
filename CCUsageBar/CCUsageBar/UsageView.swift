@@ -19,7 +19,7 @@ struct UsageStackView: View {
                     .frame(maxHeight: .infinity)
             }
         }
-        .frame(width: 520, height: 380)
+        .frame(width: 520, height: 410)
         .background(bgColor)
     }
 }
@@ -34,7 +34,8 @@ private struct ProviderHeader: View {
             .foregroundStyle(.white.opacity(0.85))
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 12)
-            .padding(.vertical, 6)
+            .padding(.top, 8)
+            .padding(.bottom, 6)
             .background(headerColor)
     }
 }

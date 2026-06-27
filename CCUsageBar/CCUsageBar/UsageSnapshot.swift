@@ -39,9 +39,9 @@ enum UsageSnapshotParser {
         let metrics: [UsageMetric]
         switch provider.id {
         case "claude":
-            metrics = parseClaude(lines: lines, providerID: provider.id)
+            metrics = parseClaude(lines: lines, providerID: provider.id, capturedAt: capturedAt)
         case "codex":
-            metrics = parseCodex(lines: lines, providerID: provider.id)
+            metrics = parseCodex(lines: lines, providerID: provider.id, capturedAt: capturedAt)
         default:
             metrics = []
         }
@@ -53,7 +53,7 @@ enum UsageSnapshotParser {
         )
     }
 
-    private static func parseClaude(lines: [String], providerID: String) -> [UsageMetric] {
+    private static func parseClaude(lines: [String], providerID: String, capturedAt: Date) -> [UsageMetric] {
         var metrics: [UsageMetric] = []
 
         for (index, line) in lines.enumerated() {
@@ -61,6 +61,7 @@ enum UsageSnapshotParser {
 
             var percent: Int?
             var detail: String?
+            let includeRelativeDays = line.hasPrefix("Current week")
             let lookaheadEnd = min(lines.count, index + 8)
 
             for candidate in lines[index..<lookaheadEnd] {
@@ -73,7 +74,11 @@ enum UsageSnapshotParser {
                     percent = min(max(parsed, 0), 100)
                 }
                 if detail == nil, candidate.localizedCaseInsensitiveContains("resets") {
-                    detail = candidate
+                    detail = resetDetail(
+                        in: candidate,
+                        includeRelativeDays: includeRelativeDays,
+                        capturedAt: capturedAt
+                    ) ?? candidate
                 }
             }
 
@@ -91,13 +96,14 @@ enum UsageSnapshotParser {
         return metrics
     }
 
-    private static func parseCodex(lines: [String], providerID: String) -> [UsageMetric] {
+    private static func parseCodex(lines: [String], providerID: String, capturedAt: Date) -> [UsageMetric] {
         var metrics: [UsageMetric] = []
 
         for (index, line) in lines.enumerated() {
             if let match = captures(#"^(.+?):\s*(?:\[[^\]]+\]\s*)?(\d{1,3})\s*%\s*(left|used)\b(.*)$"#, in: line),
                let parsed = Int(match[2]) {
                 let title = cleanupTitle(match[1])
+                let includeRelativeDays = title.localizedCaseInsensitiveContains("week")
                 let suffix = match[3].lowercased()
                 let rawPercent = min(max(parsed, 0), 100)
                 let usedPercent = suffix == "left" ? 100 - rawPercent : rawPercent
@@ -107,7 +113,13 @@ enum UsageSnapshotParser {
                     percent: usedPercent,
                     direction: .used,
                     valueText: "\(usedPercent)% used",
-                    detail: codexResetDetail(lines: lines, metricIndex: index, sameLineRemainder: match[4])
+                    detail: codexResetDetail(
+                        lines: lines,
+                        metricIndex: index,
+                        sameLineRemainder: match[4],
+                        includeRelativeDays: includeRelativeDays,
+                        capturedAt: capturedAt
+                    )
                 ))
             } else if let match = captures(#"^Credits:\s*(.+)$"#, in: line) {
                 let value = match[1].trimmingCharacters(in: .whitespacesAndNewlines)
@@ -129,9 +141,15 @@ enum UsageSnapshotParser {
     private static func codexResetDetail(
         lines: [String],
         metricIndex: Int,
-        sameLineRemainder: String
+        sameLineRemainder: String,
+        includeRelativeDays: Bool,
+        capturedAt: Date
     ) -> String? {
-        if let detail = resetDetail(in: sameLineRemainder) {
+        if let detail = resetDetail(
+            in: sameLineRemainder,
+            includeRelativeDays: includeRelativeDays,
+            capturedAt: capturedAt
+        ) {
             return detail
         }
 
@@ -142,7 +160,11 @@ enum UsageSnapshotParser {
             if isCodexMetricLine(candidate) || candidate.hasPrefix("Credits:") {
                 break
             }
-            if let detail = resetDetail(in: candidate) {
+            if let detail = resetDetail(
+                in: candidate,
+                includeRelativeDays: includeRelativeDays,
+                capturedAt: capturedAt
+            ) {
                 return detail
             }
         }
@@ -150,14 +172,29 @@ enum UsageSnapshotParser {
         return nil
     }
 
-    private static func resetDetail(in line: String) -> String? {
+    private static func resetDetail(
+        in line: String,
+        includeRelativeDays: Bool = false,
+        capturedAt: Date = Date()
+    ) -> String? {
         guard let match = captures(#"\b(resets?|renews?|refreshes?)\b[:\s-]*(.+)$"#, in: line) else {
             return nil
         }
         let verb = match[1].lowercased() == "reset" ? "Resets" : capitalizedFirst(match[1])
-        let value = cleanupResetValue(match[2])
+        let timezone = timezoneAnnotation(in: match[2]) ?? TimeZone.current.identifier
+        let value = normalizedResetValue(match[2])
         guard !value.isEmpty else { return nil }
-        return "\(verb) \(value)"
+
+        if includeRelativeDays,
+           let relativeDays = relativeDaysText(
+                for: value,
+                timezoneIdentifier: timezone,
+                capturedAt: capturedAt
+           ) {
+            return "\(verb) in \(relativeDays) on \(value) (\(timezone))"
+        }
+
+        return "\(verb) \(value) (\(timezone))"
     }
 
     private static func normalizedLines(from text: String) -> [String] {
@@ -196,8 +233,9 @@ enum UsageSnapshotParser {
         return first.uppercased() + value.dropFirst().lowercased()
     }
 
-    private static func cleanupResetValue(_ value: String) -> String {
+    private static func normalizedResetValue(_ value: String) -> String {
         var cleaned = value
+            .replacingOccurrences(of: #"\s*\([^)]*\)\s*$"#, with: "", options: .regularExpression)
             .trimmingCharacters(in: CharacterSet(charactersIn: " :—-"))
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
@@ -206,7 +244,164 @@ enum UsageSnapshotParser {
             cleaned = cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
         }
 
+        if let match = captures(#"^(\d{1,2}):(\d{2})\s+on\s+(\d{1,2})\s+([A-Za-z]{3,9})$"#, in: cleaned),
+           let time = normalizedTwentyFourHourTime(hour: match[1], minute: match[2]) {
+            let day = Int(match[3]).map(String.init) ?? match[3]
+            return "\(normalizedMonth(match[4])) \(day) at \(time)"
+        }
+
+        if let match = captures(#"^([A-Za-z]{3,9})\s+(\d{1,2})\s+at\s+(.+)$"#, in: cleaned) {
+            let time = normalizedClockTime(match[3]) ?? match[3]
+            let day = Int(match[2]).map(String.init) ?? match[2]
+            return "\(normalizedMonth(match[1])) \(day) at \(time)"
+        }
+
+        if let time = normalizedClockTime(cleaned) {
+            return time
+        }
+
         return cleaned
+    }
+
+    private static func timezoneAnnotation(in value: String) -> String? {
+        guard let match = captures(#"\(([^)]+)\)\s*$"#, in: value) else {
+            return nil
+        }
+
+        let timezone = match[1].trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !timezone.isEmpty else { return nil }
+        return timezone
+    }
+
+    private static func relativeDaysText(
+        for normalizedValue: String,
+        timezoneIdentifier: String,
+        capturedAt: Date
+    ) -> String? {
+        guard let resetDate = resetDate(
+            from: normalizedValue,
+            timezoneIdentifier: timezoneIdentifier,
+            capturedAt: capturedAt
+        ) else {
+            return nil
+        }
+
+        let interval = resetDate.timeIntervalSince(capturedAt)
+        guard interval > 0 else { return "<1 day" }
+
+        let days = Int(interval / 86_400)
+        if days < 1 {
+            return "<1 day"
+        }
+        return days == 1 ? "1 day" : "\(days) days"
+    }
+
+    private static func resetDate(
+        from normalizedValue: String,
+        timezoneIdentifier: String,
+        capturedAt: Date
+    ) -> Date? {
+        guard let match = captures(#"^([A-Za-z]{3,9})\s+(\d{1,2})\s+at\s+(\d{1,2}):(\d{2})(am|pm)$"#, in: normalizedValue),
+              let month = monthNumber(match[1]),
+              let day = Int(match[2]),
+              let hour = Int(match[3]),
+              let minute = Int(match[4]) else {
+            return nil
+        }
+
+        let timezone = TimeZone(identifier: timezoneIdentifier) ?? .current
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timezone
+
+        let capturedComponents = calendar.dateComponents([.year], from: capturedAt)
+        guard let capturedYear = capturedComponents.year else { return nil }
+
+        let suffix = match[5].lowercased()
+        let hour24: Int
+        if suffix == "am" {
+            hour24 = hour == 12 ? 0 : hour
+        } else {
+            hour24 = hour == 12 ? 12 : hour + 12
+        }
+
+        var components = DateComponents()
+        components.calendar = calendar
+        components.timeZone = timezone
+        components.year = capturedYear
+        components.month = month
+        components.day = day
+        components.hour = hour24
+        components.minute = minute
+
+        guard var date = calendar.date(from: components) else { return nil }
+        if date < capturedAt {
+            components.year = capturedYear + 1
+            guard let nextYearDate = calendar.date(from: components) else { return nil }
+            date = nextYearDate
+        }
+        return date
+    }
+
+    private static func normalizedClockTime(_ value: String) -> String? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if let match = captures(#"^(\d{1,2}):(\d{2})$"#, in: trimmed) {
+            return normalizedTwentyFourHourTime(hour: match[1], minute: match[2])
+        }
+
+        if let match = captures(#"^(\d{1,2})(?::(\d{2}))?\s*([ap]m)$"#, in: trimmed),
+           let hour = Int(match[1]) {
+            let minute = match.count > 2 && !match[2].isEmpty ? match[2] : "00"
+            return "\(hour):\(minute)\(match[3].lowercased())"
+        }
+
+        return nil
+    }
+
+    private static func normalizedTwentyFourHourTime(hour: String, minute: String) -> String? {
+        guard let hour = Int(hour) else { return nil }
+        let clampedHour = min(max(hour, 0), 23)
+        let displayHour = clampedHour % 12 == 0 ? 12 : clampedHour % 12
+        let suffix = clampedHour < 12 ? "am" : "pm"
+        return "\(displayHour):\(minute)\(suffix)"
+    }
+
+    private static func normalizedMonth(_ value: String) -> String {
+        let key = value.lowercased()
+        let months = [
+            "jan": "Jan", "january": "Jan",
+            "feb": "Feb", "february": "Feb",
+            "mar": "Mar", "march": "Mar",
+            "apr": "Apr", "april": "Apr",
+            "may": "May",
+            "jun": "Jun", "june": "Jun",
+            "jul": "Jul", "july": "Jul",
+            "aug": "Aug", "august": "Aug",
+            "sep": "Sep", "sept": "Sep", "september": "Sep",
+            "oct": "Oct", "october": "Oct",
+            "nov": "Nov", "november": "Nov",
+            "dec": "Dec", "december": "Dec",
+        ]
+        return months[key] ?? capitalizedFirst(value)
+    }
+
+    private static func monthNumber(_ value: String) -> Int? {
+        let key = value.lowercased()
+        let months = [
+            "jan": 1, "january": 1,
+            "feb": 2, "february": 2,
+            "mar": 3, "march": 3,
+            "apr": 4, "april": 4,
+            "may": 5,
+            "jun": 6, "june": 6,
+            "jul": 7, "july": 7,
+            "aug": 8, "august": 8,
+            "sep": 9, "sept": 9, "september": 9,
+            "oct": 10, "october": 10,
+            "nov": 11, "november": 11,
+            "dec": 12, "december": 12,
+        ]
+        return months[key]
     }
 
     private static func normalizedID(_ value: String) -> String {
@@ -225,11 +420,11 @@ enum UsageSnapshotParser {
             return nil
         }
 
-        return (0..<match.numberOfRanges).compactMap { index in
+        return (0..<match.numberOfRanges).map { index in
             let nsRange = match.range(at: index)
             guard nsRange.location != NSNotFound,
                   let range = Range(nsRange, in: text) else {
-                return nil
+                return ""
             }
             return String(text[range])
         }

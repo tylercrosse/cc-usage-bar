@@ -44,7 +44,7 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
         }
 
         // Popover hosting the stacked per-provider SwiftUI views
-        popover.contentSize = NSSize(width: 520, height: 380)
+        popover.contentSize = NSSize(width: 520, height: 410)
         popover.behavior = .transient     // Dismiss on outside click
         popover.animates = false
         popover.delegate = self

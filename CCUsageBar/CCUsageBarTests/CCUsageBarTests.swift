@@ -108,6 +108,8 @@ struct ANSIParserTests {
 
 struct UsageSnapshotParserTests {
     @Test func parsesClaudeUsageRows() {
+        let timezone = TimeZone(identifier: "America/Los_Angeles") ?? .current
+        let capturedAt = fixedDate(year: 2026, month: 6, day: 28, hour: 10, minute: 0, timezone: timezone)
         let output = NSAttributedString(string: """
         Current session
         █████░░░░░ 47% used
@@ -118,7 +120,7 @@ struct UsageSnapshotParserTests {
         Resets Jun 28 at 9pm (America/Los_Angeles)
         """)
 
-        let snapshot = UsageSnapshotParser.parse(provider: .claude, rawOutput: output)
+        let snapshot = UsageSnapshotParser.parse(provider: .claude, rawOutput: output, capturedAt: capturedAt)
 
         #expect(snapshot.metrics.count == 2)
         #expect(snapshot.metrics[0].title == "Current session")
@@ -126,30 +128,57 @@ struct UsageSnapshotParserTests {
         #expect(snapshot.metrics[0].detail == "Resets 12:30pm (America/Los_Angeles)")
         #expect(snapshot.metrics[1].title == "Current week (all models)")
         #expect(snapshot.metrics[1].valueText == "62% used")
+        #expect(snapshot.metrics[1].detail == "Resets in <1 day on Jun 28 at 9:00pm (America/Los_Angeles)")
     }
 
     @Test func parsesCodexStatusRows() {
+        let timezone = TimeZone.current
+        let capturedAt = fixedDate(year: 2026, month: 6, day: 27, hour: 9, minute: 0, timezone: timezone)
         let output = NSAttributedString(string: """
         ╭──────────────────────────────────────╮
         │  >_ OpenAI Codex (v0.142.3)           │
         │  5h limit:    [███░░░░] 12% left      │
-        │  Resets 1:30pm)                       │
+        │  Resets 13:30)                        │
         │  Weekly limit:[████████░] 60% left    │
-        │  Resets Jun 28 at 9pm)                │
+        │  Resets 16:28 on 1 Jul)               │
         │  Credits:     143 credits             │
         ╰──────────────────────────────────────╯
         """)
 
-        let snapshot = UsageSnapshotParser.parse(provider: .codex, rawOutput: output)
+        let snapshot = UsageSnapshotParser.parse(provider: .codex, rawOutput: output, capturedAt: capturedAt)
+        let timezoneName = timezone.identifier
 
         #expect(snapshot.metrics.count == 3)
         #expect(snapshot.metrics[0].title == "5h limit")
         #expect(snapshot.metrics[0].valueText == "88% used")
-        #expect(snapshot.metrics[0].detail == "Resets 1:30pm")
+        #expect(snapshot.metrics[0].detail == "Resets 1:30pm (\(timezoneName))")
         #expect(snapshot.metrics[1].title == "Weekly limit")
         #expect(snapshot.metrics[1].valueText == "40% used")
-        #expect(snapshot.metrics[1].detail == "Resets Jun 28 at 9pm")
+        #expect(snapshot.metrics[1].detail == "Resets in 4 days on Jul 1 at 4:28pm (\(timezoneName))")
         #expect(snapshot.metrics[2].title == "Credits")
         #expect(snapshot.metrics[2].valueText == "143 credits")
+    }
+
+    private func fixedDate(
+        year: Int,
+        month: Int,
+        day: Int,
+        hour: Int,
+        minute: Int,
+        timezone: TimeZone
+    ) -> Date {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timezone
+
+        var components = DateComponents()
+        components.calendar = calendar
+        components.timeZone = timezone
+        components.year = year
+        components.month = month
+        components.day = day
+        components.hour = hour
+        components.minute = minute
+
+        return calendar.date(from: components) ?? Date(timeIntervalSince1970: 0)
     }
 }
