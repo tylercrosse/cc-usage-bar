@@ -2,6 +2,7 @@
 
 ## 1.2
 
+- Calmer violet / amber / coral palette with subtle vertical-gradient progress bars (replaces system green/orange/red); wider bars and body-size detail labels for legibility
 - macOS notifications when usage crosses 60% / 80% / 100% per metric
 - Reset details now show relative time ("Resets in 4h 30m at 1:30pm …") for time-based windows, in addition to the existing relative-days style
 - Metrics carry a stable `resetIdentifier` so the notifier can distinguish a new reset window from usage movement within the same window
